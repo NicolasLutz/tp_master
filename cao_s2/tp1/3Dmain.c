@@ -1,0 +1,264 @@
+#include <GL/glut.h>
+#include <GL/glx.h>
+#include <stdlib.h>
+#include <stdio.h>
+
+/* dimensions de la fenetre */
+int width = 600;
+int height = 400;
+
+/*************************************************************************/
+/* Bezier */
+/*************************************************************************/
+
+#define MAX_POINTS 100
+typedef struct
+{
+	float x, y, z;
+} Point;
+
+typedef Point Grille[MAX_POINTS][MAX_POINTS];
+Grille carreau;
+int nbQuads=0;
+
+Point pt(float x, float y, float z)
+{
+	Point p;
+	p.x = x;
+	p.y = y;
+	p.z = z;
+	return p;
+}
+
+Point P_add(Point p1, Point p2)
+{
+	Point pRes;
+	pRes.x = p1.x+p2.x;
+	pRes.y = p1.y+p2.y;
+	pRes.z = p1.z+p2.z;
+	return pRes;
+}
+
+Point P_mult(Point p, double scalar)
+{
+	Point pRes;
+	pRes.x = p.x*scalar;
+	pRes.y = p.y*scalar;
+	pRes.z = p.z*scalar;
+	return pRes;
+}
+
+Point Bezier3D(float s, float t)
+{
+	if(nbQuads==0)
+	{
+		Point p=pt(0,0,0);
+		return p;
+	}
+	int i, j, nbQuadsInterpolate=nbQuads;
+	Point saveIJ1, saveIJ2;
+	Grille carreauInterpolate;
+	for(i=0; i<nbQuadsInterpolate; ++i)
+	{
+		for(j=0; j<nbQuadsInterpolate; ++j)
+			carreauInterpolate[i][j]=carreau[i][j];
+	}
+	while(--nbQuadsInterpolate > 0)
+	{
+		for(i=0; i<nbQuadsInterpolate; ++i)
+		{
+			for(j=0; j<nbQuadsInterpolate; ++j)
+			{
+				//note: precalculable
+				saveIJ1=P_add( P_mult(carreauInterpolate[i][j],1-t), P_mult(carreauInterpolate[i][j+1],t) ); //P(0,1)i,j
+				saveIJ2=P_add( P_mult(carreauInterpolate[i+1][j],1-t), P_mult(carreauInterpolate[i+1][j+1],t) ); //P(1,0)i,j 
+				carreauInterpolate[i][j]=P_add( P_mult(saveIJ1,1-s), P_mult(saveIJ2,s) );
+			}
+		}
+	}
+	return carreauInterpolate[0][0];
+}
+
+/*************************************************************************/
+/* Fonctions de dessin */
+/*************************************************************************/
+
+/* rouge vert bleu entre 0 et 1 */
+void chooseColor(double r, double g, double b)
+{
+	glColor3d(r,g,b);
+}
+
+void drawPoint(double x, double  y, double z)
+{
+	glBegin(GL_POINTS);
+	glVertex3d(x,y,z);
+	glEnd();
+}
+
+void drawLine(double x1, double  y1, double z1, double x2, double y2, double z2)
+{
+	glBegin(GL_LINES);
+	glVertex3d(x1,y1,z1);
+	glVertex3d(x2,y2,z2);
+	glEnd();
+}
+
+void drawQuad(Point p1, Point p2, Point p3, Point p4)
+{
+	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	glBegin(GL_QUADS);
+	glVertex3f(p1.x,p1.y,p1.z);
+	glVertex3f(p2.x,p2.y,p2.z);
+	glVertex3f(p3.x,p3.y,p3.z);
+	glVertex3f(p4.x,p4.y,p4.z);
+	glEnd();
+}
+
+/*************************************************************************/
+/* Fonctions callback */
+/*************************************************************************/
+
+void display()
+{
+	int i,j;
+	
+	glEnable(GL_DEPTH);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	gluPerspective( 60, (float)width/height, 1, 100);
+
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+	glTranslatef(-4,-2,-5);
+	glRotated(25,1,0,0);
+	glRotated(90,0,1,0);
+	glRotated(-120,1,1,1);
+	
+	// ** Repere du Monde **
+	chooseColor(1.0,0,0); // axe x=rouge
+	drawLine(0,0,0, 1,0,0);
+	chooseColor(0,1.0,0); // axe y=vert
+	drawLine(0,0,0, 0,1,0);
+	chooseColor(0,0,1.0); // axe z=bleu
+	drawLine(0,0,0, 0,0,1);
+	
+	// ** Grille sur plan XY **
+	chooseColor(0.2,0.2,0.2); 
+	glLineWidth(2.0);
+	for (i=1; i<10; i++)
+	{
+		drawLine(i,0,0, i,9,0);
+		drawLine(0,i,0, 9,i,0);
+	}
+
+	chooseColor(1,1,1); 
+	// ** Dessinez ici **
+	for(i=0; i<nbQuads; ++i)
+	{
+		for(j=0; i<nbQuads; ++i)
+		{
+			drawQuad(carreau[i][j],carreau[i+1][j], carreau[i+1,j+1], carreau[i, j+1]);	
+		}
+	}
+	glutSwapBuffers();
+}
+
+void keyboard(unsigned char keycode, int x, int y)
+{
+	/* touche ECHAP */
+	if (keycode==27) 
+		exit(0);
+	/* touche ECHAP */
+	if (keycode=='z')
+		printf("La touche z a ete enfoncee\n");
+
+	glutPostRedisplay();
+}
+
+void reshape(int w, int h)
+{
+	width=w;
+	height=h;
+	glViewport(0, 0, w, h);
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	gluOrtho2D( 0, w, h, 0);
+	glMatrixMode(GL_MODELVIEW);
+}
+
+void mouse(int button, int state, int x, int y)
+{
+	if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN)
+	{
+		printf("Clic at %d %d\n",x,y);
+		glutPostRedisplay();
+	}
+}
+
+void C_gen()
+{
+	carreau[0][0]=pt(0,0,0);
+	carreau[0][1]=pt(0,1,0);
+	carreau[0][2]=pt(0,2,0);
+	carreau[0][3]=pt(0,3,0);
+
+	carreau[1][0]=pt(1,0,0);
+	carreau[1][1]=pt(1,1,2);
+	carreau[1][2]=pt(1,2,1);
+	carreau[1][3]=pt(1,3,1);
+
+	carreau[2][0]=pt(2,0,0);
+	carreau[2][1]=pt(2,1,2);
+	carreau[2][2]=pt(2,2,1);
+	carreau[2][3]=pt(2,3,1);
+
+	carreau[3][0]=pt(3,0,0);
+	carreau[3][1]=pt(3,1,0);
+	carreau[3][2]=pt(3,2,0);
+	carreau[3][3]=pt(3,3,0);
+	nbQuads=4;
+}
+
+/*************************************************************************/
+/* Fonction principale */
+/*************************************************************************/
+
+int main(int argc, char *argv[]) 
+{
+	/* Initialisations globales */
+	glutInit(&argc, argv);
+	C_gen();
+
+	/* Définition des attributs de la fenetre OpenGL */
+    glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH);
+
+	/* Placement de la fenetre */
+	glutInitWindowSize(width, height);
+	glutInitWindowPosition(50, 50);
+	
+	/* Création de la fenetre */
+    glutCreateWindow("Carreau de Bezier");
+
+	/* Choix de la fonction d'affichage */
+	glutDisplayFunc(display);
+
+	/* Choix de la fonction de redimensionnement de la fenetre */
+	glutReshapeFunc(reshape);
+	
+	/* Choix des fonctions de gestion du clavier */
+	glutKeyboardFunc(keyboard);
+	//glutSpecialFunc(special);
+	
+	/* Choix de la fonction de gestion de la souris */
+	glutMouseFunc(mouse);
+
+	/* Boucle principale */
+    glutMainLoop();
+
+	/* Même si glutMainLoop ne rends JAMAIS la main, il faut définir le return, sinon
+	le compilateur risque de crier */
+    return 0;
+}
