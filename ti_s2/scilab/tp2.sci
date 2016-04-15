@@ -9,8 +9,13 @@ function f=Four_apply(filename)
 endfunction
 
 function Four_bois()
-    img=Four_apply("some_file.jpg");
-    imwrite(uint8(f*255),"some_file_fourier.png");
+    img=Four_apply("images/grey/bois.jpg");
+    imwrite(uint8(f*255),"bois_fourier.png");
+endfunction
+
+function Four_boisSobel()
+    img=Four_apply("images/out/boisGradH1H2.png");
+    imwrite(uint8(f*255),"bois.png");
 endfunction
 
 //Prewitt & Sobel
@@ -36,7 +41,7 @@ endfunction
 //Le bruit peut créer de brusques variations locales des valeurs des pixels,
 //"affolant" ainsi le filtre qui renvoie une image elle-même bruitée.
 
-function f=PS_toNorm2(i1h1, i1h2)
+function f=PS_toNorm2_old(i1h1, i1h2)
     img_size=size(i1h1);
     img_i=img_size(1);
     img_j=img_size(2);
@@ -47,45 +52,53 @@ function f=PS_toNorm2(i1h1, i1h2)
     end;
 endfunction
 
-function f=PS_prewitt(filename)
-    img=imread(filename);
-    c=1;
-    h1=[1 0 -1; c 0 -c; 1 0 -1];
-    h2=[-1 -c -1; 0 0 0; 1 c 1];
-    f=double(img)/255.0;
-    i1h1=imconv(f, h1);
-    imwrite(uint8(i1h1*255),"prewittH1.png");
-    i1h2=imconv(f, h2);
-    imwrite(uint8(i1h2*255),"prewittH2.png");
-    f=PS_toNorm2(i1h1, i1h2);
-    imwrite(uint8(f*255),"prewittN2H1H2.png");
+function f=PS_toNorm2(res1, res2)
+    f=round(sqrt(res1.^ 2+ res2.^ 2));
 endfunction
 
-function f=PS_sobel(filename) //normaliser en fonction du gradiant
+function PS_prewitt_sobel(filename, outH1, outH2, outH3, outH4, outGradH1H2, outGradH3H4, c)
     img=imread(filename);
-    c=2;
     h1=[1 0 -1; c 0 -c; 1 0 -1];
     h2=[-1 -c -1; 0 0 0; 1 c 1];
+    h3=[c 1 0; 1 0 -1; 0 -1 -c];
+    h4=[0 1 c; -1 0 1; -c -1 0];
     f=double(img)/255.0;
+    
     i1h1=imconv(f, h1);
-    imwrite(uint8(i1h1*255),"sobelH1.png");
+    imwrite(uint8(i1h1*255),outH1);
+    
     i1h2=imconv(f, h2);
-    imwrite(uint8(i1h2*255),"sobelH2.png");
-    f=PS_toNorm2(i1h1, i1h2);
-    imwrite(uint8(f*255),"sobelN2H1H2.png");
+    imwrite(uint8(i1h2*255),outH2);
+    
+    i1grad1=PS_toNorm2(i1h1, i1h2);
+    imwrite(uint8(i1grad1*255),outGradH1H2);
+    
+    i1h3=imconv(f, h3);
+    imwrite(uint8(i1h3*255),outH3);
+    
+    i1h4=imconv(f, h4);
+    imwrite(uint8(i1h4*255),outH4);
+    
+    i1grad2=PS_toNorm2(i1h3, i1h4);
+    imwrite(uint8(i1grad2*255),outGradH3H4);
 endfunction
 
-function PS_full(filename)
-    PS_prewitt(filename);
-    PS_sobel(filename);
+function PS_full(filename, outH1, outH2, outH3, outH4, outGradH1H2, outGradH3H4)
+    PS_prewitt_sobel(filename, outH1, outH2, outH3, outH4, outGradH1H2, outGradH3H4, 1);
+    PS_prewitt_sobel(filename, outH1, outH2, outH3, outH4, outGradH1H2, outGradH3H4, 2);
 endfunction
 
 function PS_bois()
-    PS_full("images/grey/bois.jpg");
+    PS_full("images/grey/bois.jpg", "images/out/boisH1.png", "images/out/boisH2.png", "images/out/boisH3.png", "images/out/boisH4.png", "images/out/boisGradH1H2.png", "images/out/boisGradH3H4.png");
 endfunction
 
-function PS_lena()
-    PS_full("images/grey/lena.jpg");
+function PS_boisbruit()
+    PS_full("images/grey/boisbruit.jpg", "images/out/boisbruitH1.png", "images/out/boisbruitH2.png", "images/out/boisbruitH3.png", "images/out/boisbruitH4.png", "images/out/boisbruitGradH1H2.png", "images/out/boisbruitGradH3H4.png");
+endfunction
+
+function PS_all()
+    PS_bois();
+    PS_boisbruit();
 endfunction
 
 //Lissage

@@ -154,7 +154,7 @@ void display()
 		drawLine(0,i,0, 9,i,0);
 	}
 
-	chooseColor(1,1,1);
+	chooseColor(1,1,1); 
 	// ** Dessinez ici **
 	for(i=0; i<nbQuads; ++i)
 	{
